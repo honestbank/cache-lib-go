@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -29,7 +29,8 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
 	success, err := c.client.SetNX(ctx, key, "", time.Second*5).Result()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+
 		return nil, err
 	}
 	if !success {
@@ -50,27 +51,35 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	}
 
 	c.client.Del(ctx, key)
+
 	return data, nil
 }
 
 func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, error) {
 	subscription := NewCacheSubscription(c.client, key)
 	subscription.Subscribe(ctx)
-	defer subscription.Unsubscribe(ctx)
+	defer func() {
+		err := subscription.Unsubscribe(ctx)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	channel, err := subscription.GetChannel(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	for msg := range channel {
-		var u Data
-		// Unmarshal the data into the user
-		if err := json.Unmarshal([]byte(msg.Payload), &u); err != nil {
-			return nil, err
+		if msg.Payload != "" {
+			var u Data
+			// Unmarshal the data into the user
+			if err := json.Unmarshal([]byte(msg.Payload), &u); err != nil {
+				return nil, err
+			}
+
+			return &u, nil
 		}
-
-		return &u, nil
-
 	}
+
 	return nil, errors.New("Something derped")
 }

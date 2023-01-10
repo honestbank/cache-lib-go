@@ -48,12 +48,12 @@ func (cs *cacheSubscription) Subscribe(ctx context.Context) CacheSubscription {
 	}
 
 	return cs
-
 }
 
 func (cs *cacheSubscription) GetChannel(ctx context.Context) (<-chan *redis.Message, error) {
 	if cs.Subscription == nil {
 		return nil, errors.New("No subscription")
 	}
+
 	return cs.Subscription.Channel(), nil
 }
