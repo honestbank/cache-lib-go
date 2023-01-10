@@ -1,0 +1,24 @@
+name: "ShiftLeft Go Workflow"
+
+on:   # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # schedule a job to run every day at 17:30 UTC
+    - cron: '30 17 * * *'
+
+jobs:
+  main:
+    name: shiftleft-go-repository-job
+    uses: honestbank/workflows/.github/workflows/go-shiftleft.yaml@main
+    with:
+      repo_name: ${{ github.event.repository.name }}
+    secrets: inherit
