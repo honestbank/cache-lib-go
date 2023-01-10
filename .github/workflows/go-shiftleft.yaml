@@ -1,7 +1,7 @@
 # yamllint disable rule:brackets rule:colons rule:line-length
 # This workflow integrates ShiftLeft NG SAST with GitHub
 # Visit https://docs.shiftleft.io for help
-name: shiftleft-go-repository-job
+name: shiftleft-go
 
 on:   # yamllint disable-line rule:truthy
   push:
