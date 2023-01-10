@@ -22,7 +22,7 @@ on:   # yamllint disable-line rule:truthy
 
 jobs:
   shiftleft-go:
-    name: shiftleft-go-internal-job
+    name: shiftleft-go
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
