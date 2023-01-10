@@ -1,7 +1,6 @@
 # yamllint disable rule:brackets rule:colons rule:line-length
 # This workflow integrates ShiftLeft NG SAST with GitHub
 # Visit https://docs.shiftleft.io for help
----
 name: shiftleft-go-repository-job
 
 on:   # yamllint disable-line rule:truthy
@@ -19,15 +18,16 @@ on:   # yamllint disable-line rule:truthy
     # schedule a job to run every day at 17:30 UTC
     - cron: '30 17 * * *'
 
-env:
-  GOPRIVATE: github.com/honestbank
-  APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+
 
 jobs:
   shiftleft-go:
     name: shiftleft-go-internal-job
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/honestbank
+      APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
