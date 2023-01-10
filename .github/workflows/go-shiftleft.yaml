@@ -5,6 +5,19 @@
 name: shiftleft-go-repository-job
 
 on:   # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # schedule a job to run every day at 17:30 UTC
+    - cron: '30 17 * * *'
 
 env:
   GOPRIVATE: github.com/honestbank
