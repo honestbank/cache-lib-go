@@ -458,4 +458,6 @@ coverage.tmp
 
 .idea
 
-example/pubsub/node_modules
+# other unneeded files
+examples/pubsub/js_script/node_modules
+mocks/
