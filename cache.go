@@ -27,7 +27,7 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 }
 
 func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
-	success, err := c.client.SetNX(ctx, key, "", time.Second*5).Result()
+	success, err := c.client.SetNX(ctx, key, "", ttl).Result()
 	if err != nil {
 		log.Println(err)
 
@@ -39,6 +39,8 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	data, err := fn(ctx)
 	if err != nil {
 		c.client.Publish(ctx, key, "cache miss")
+
+		return nil, err
 	}
 	bytedata, err := json.Marshal(*data)
 	if err != nil {
@@ -64,6 +66,7 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 			log.Println(err)
 		}
 	}()
+
 	channel, err := subscription.GetChannel(ctx)
 	if err != nil {
 		return nil, err
@@ -81,5 +84,5 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 		}
 	}
 
-	return nil, errors.New("Something derped")
+	return nil, errors.New("error reading from pub/sub")
 }
