@@ -29,14 +29,17 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
 	cachedData, _ := c.client.Get(ctx, key+"_success").Result()
 
-	if cachedData != "" {
-		var marshaledData Data
-		_ = json.Unmarshal([]byte(cachedData), &marshaledData)
-
-		return &marshaledData
+	if cachedData == "" {
+		return nil
 	}
 
-	return nil
+	var marshaledData Data
+	err := json.Unmarshal([]byte(cachedData), &marshaledData)
+	if err != nil {
+		return nil
+	}
+
+	return &marshaledData
 }
 
 func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
