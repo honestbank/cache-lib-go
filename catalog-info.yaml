@@ -1,0 +1,17 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cache-lib-go
+  description: Library for handing Kafka messages with retries
+  annotations:
+    github.com/project-slug: honestbank/cache-lib-go
+    sonarqube.org/project-key: honestbank_cache-lib-go
+  tags:
+    - language:golang
+spec:
+  type: library
+  lifecycle: production
+  owner: group:spend-squad
+  dependsOn:
+    - resource:memstore-redis

@@ -1,0 +1,21 @@
+name: deploy-docs
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: deploy-to-gh-pages
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: git config user.name github-actions
+      - run: git config user.email github-actions@github.com
+      - run: cd docs && npm ci && npm run build
+      - uses: crazy-max/ghaction-github-pages@v2
+        with:
+          target_branch: gh-pages
+          build_dir: docs/build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

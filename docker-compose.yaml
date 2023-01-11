@@ -1,0 +1,15 @@
+version: '3.5'
+services:
+  redis-node-1:
+    image: 'redis:6.2.8-alpine'
+
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-node-1-data:/var/lib/redis
+    networks:
+      app_subnet:
+volumes:
+  redis-node-1-data:
+networks:
+  app_subnet:
