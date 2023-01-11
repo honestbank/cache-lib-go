@@ -458,4 +458,4 @@ coverage.tmp
 
 .idea
 
-example/pubsub/node_modules
+example/pubsub/js_script/node_modules
