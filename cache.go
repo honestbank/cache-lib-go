@@ -27,7 +27,7 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 }
 
 func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
-	cachedData, _ := c.client.Get(ctx, key+"_success").Result()
+	cachedData, _ := c.client.Get(ctx, key).Result()
 
 	if cachedData == "" {
 		return nil
@@ -66,7 +66,7 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.client.SetNX(ctx, key+"_success", string(bytedata), ttl).Result()
+	_, err = c.client.Set(ctx, key, string(bytedata), ttl).Result()
 	if err != nil {
 		log.Println(err)
 
@@ -76,8 +76,6 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	if err != nil {
 		return nil, err
 	}
-
-	c.client.Del(ctx, key)
 
 	return data, nil
 }
