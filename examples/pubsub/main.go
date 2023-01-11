@@ -122,7 +122,7 @@ func main() {
 			}
 			return &response, nil
 
-		}, "img", 1*time.Second)
+		}, "img", 10*time.Second)
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func main() {
 			}
 			return &response, nil
 
-		}, hashedKey, 1*time.Second)
+		}, hashedKey, 10*time.Second)
 		if err != nil {
 			return err
 		}

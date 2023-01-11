@@ -26,7 +26,31 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 	}
 }
 
+func (c *cache[Data]) getCachedData(ctx context.Context, key string) (*Data, error) {
+	cachedData, err := c.client.Get(ctx, key+"_success").Result()
+	if err != nil {
+		return nil, nil
+	}
+
+	if cachedData != "" {
+		var marshaledData Data
+		err = json.Unmarshal([]byte(cachedData), &marshaledData)
+
+		return &marshaledData, err
+	}
+
+	return nil, nil
+}
+
 func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
+	cachedData, err := c.getCachedData(ctx, key)
+	if err != nil {
+		log.Println(err)
+
+		return nil, err
+	} else if cachedData != nil {
+		return cachedData, err
+	}
 	success, err := c.client.SetNX(ctx, key, "", ttl).Result()
 	if err != nil {
 		log.Println(err)
@@ -46,7 +70,12 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	if err != nil {
 		return nil, err
 	}
+	_, err = c.client.SetNX(ctx, key+"_success", string(bytedata), ttl).Result()
+	if err != nil {
+		log.Println(err)
 
+		return nil, err
+	}
 	_, err = c.client.Publish(ctx, key, string(bytedata)).Result()
 	if err != nil {
 		return nil, err

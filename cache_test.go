@@ -37,6 +37,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 		responseString, _ := json.Marshal(response)
 
 		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSetNX("data_success", string(responseString), 1*time.Second).SetVal(true)
 		mock.ExpectPublish("data", string(responseString)).SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
