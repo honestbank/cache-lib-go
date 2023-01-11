@@ -27,14 +27,11 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 }
 
 func (c *cache[Data]) getCachedData(ctx context.Context, key string) (*Data, error) {
-	cachedData, err := c.client.Get(ctx, key+"_success").Result()
-	if err != nil {
-		return nil, nil
-	}
+	cachedData, _ := c.client.Get(ctx, key+"_success").Result()
 
 	if cachedData != "" {
 		var marshaledData Data
-		err = json.Unmarshal([]byte(cachedData), &marshaledData)
+		err := json.Unmarshal([]byte(cachedData), &marshaledData)
 
 		return &marshaledData, err
 	}
