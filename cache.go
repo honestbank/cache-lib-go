@@ -26,27 +26,23 @@ func NewCache[Data any](client *redis.Client) Cache[Data] {
 	}
 }
 
-func (c *cache[Data]) getCachedData(ctx context.Context, key string) (*Data, error) {
+func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
 	cachedData, _ := c.client.Get(ctx, key+"_success").Result()
 
 	if cachedData != "" {
 		var marshaledData Data
-		err := json.Unmarshal([]byte(cachedData), &marshaledData)
+		_ = json.Unmarshal([]byte(cachedData), &marshaledData)
 
-		return &marshaledData, err
+		return &marshaledData
 	}
 
-	return nil, nil
+	return nil
 }
 
 func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
-	cachedData, err := c.getCachedData(ctx, key)
-	if err != nil {
-		log.Println(err)
-
-		return nil, err
-	} else if cachedData != nil {
-		return cachedData, err
+	cachedData := c.getCachedData(ctx, key)
+	if cachedData != nil {
+		return cachedData, nil
 	}
 	success, err := c.client.SetNX(ctx, key, "", ttl).Result()
 	if err != nil {
