@@ -460,4 +460,4 @@ coverage.tmp
 
 # other unneeded files
 examples/pubsub/js_script/node_modules
-mocks
+mocks/
