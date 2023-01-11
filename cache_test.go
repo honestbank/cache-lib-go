@@ -36,8 +36,29 @@ func TestCache_RememberBlocking(t *testing.T) {
 		response := Response{Result: true}
 		responseString, _ := json.Marshal(response)
 
+		mock.ExpectGet("data").SetVal("")
 		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
-		mock.ExpectSetNX("data", string(responseString), 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", string(responseString), 1*time.Second).SetVal(string(responseString))
+		mock.ExpectPublish("data", string(responseString)).SetVal(1)
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			time.Sleep(2 * time.Second)
+
+			return &response, nil
+		}, "data", 1*time.Second)
+
+		a.NoError(err)
+		a.Equal(response, *result)
+	})
+	t.Run("single cache - invalid cached", func(t *testing.T) {
+		a := assert.New(t)
+
+		response := Response{Result: true}
+		responseString, _ := json.Marshal(response)
+
+		mock.ExpectGet("data").SetVal("not valid json")
+		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", string(responseString), 1*time.Second).SetVal(string(responseString))
 		mock.ExpectPublish("data", string(responseString)).SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
