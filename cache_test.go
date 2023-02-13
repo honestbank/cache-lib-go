@@ -45,7 +45,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			return &response, nil
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(response, *result)
@@ -65,7 +65,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			return &response, nil
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(response, *result)
@@ -81,7 +81,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			return &response, nil
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.Error(err)
 		a.Nil(result)
@@ -96,7 +96,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			return nil, errors.New("request Failed")
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.Error(err)
 		a.Nil(result)
@@ -118,7 +118,7 @@ func TestCache_RememberBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			return &response, nil
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(Response{}, *result)
@@ -143,14 +143,14 @@ func TestNewCacheSubscription(t *testing.T) {
 				time.Sleep(2 * time.Second)
 
 				return &response, nil
-			}, "data", 1*time.Second)
+			}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 		}()
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 			time.Sleep(2 * time.Second)
 
 			return &response, nil
-		}, "data", 1*time.Second)
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(response, *result)
