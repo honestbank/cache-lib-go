@@ -123,6 +123,29 @@ func TestCache_RememberBlocking(t *testing.T) {
 		a.NoError(err)
 		a.Equal(Response{}, *result)
 	})
+	t.Run("single cache", func(t *testing.T) {
+		a := assert.New(t)
+
+		response := Response{Result: true}
+		responseString, _ := json.Marshal(response)
+
+		mock.ExpectGet("data").SetVal("{}")
+		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSetNX("data", string(responseString), 1*time.Second).SetVal(true)
+
+		mock.ExpectPublish("data", string(responseString)).SetVal(1)
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			time.Sleep(2 * time.Second)
+
+			return &response, nil
+		}, func(ctx context.Context, data *Response) {
+
+		}, "data", 1*time.Second)
+
+		a.NoError(err)
+		a.Equal(Response{}, *result)
+	})
 }
 
 func TestNewCacheSubscription(t *testing.T) {
