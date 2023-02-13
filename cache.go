@@ -11,14 +11,15 @@ import (
 )
 
 type Cache[Data any] interface {
-	RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error)
+	RememberBlocking(ctx context.Context, missFn MissFunc[Data], hitFn HitFunc[Data], key string, ttl time.Duration) (*Data, error)
 }
 
 type cache[Data any] struct {
 	client *redis.Client
 }
 
-type LongFunc[Data any] func(ctx context.Context) (*Data, error)
+type MissFunc[Data any] func(ctx context.Context) (*Data, error)
+type HitFunc[Data any] func(ctx context.Context, data *Data)
 
 func NewCache[Data any](client *redis.Client) Cache[Data] {
 	return &cache[Data]{
@@ -42,9 +43,11 @@ func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
 	return &marshaledData
 }
 
-func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], key string, ttl time.Duration) (*Data, error) {
+func (c *cache[Data]) RememberBlocking(ctx context.Context, missFn MissFunc[Data], hitFn HitFunc[Data], key string, ttl time.Duration) (*Data, error) {
 	cachedData := c.getCachedData(ctx, key)
 	if cachedData != nil {
+		hitFn(ctx, cachedData)
+
 		return cachedData, nil
 	}
 	success, err := c.client.SetNX(ctx, key, "", ttl).Result()
@@ -56,7 +59,7 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, fn LongFunc[Data], k
 	if !success {
 		return c.rememberWait(ctx, key)
 	}
-	data, err := fn(ctx)
+	data, err := missFn(ctx)
 	if err != nil {
 		c.client.Publish(ctx, key, "cache miss")
 
