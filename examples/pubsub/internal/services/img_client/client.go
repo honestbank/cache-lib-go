@@ -2,11 +2,10 @@ package img_client
 
 import (
 	"context"
+	"github.com/go-resty/resty/v2"
 	"io"
 	"log"
 	"net/http"
-
-	"github.com/go-resty/resty/v2"
 )
 
 type imageClient struct {
@@ -26,7 +25,9 @@ func NewImageClient(client *http.Client) ImageClient {
 func (restyClient *imageClient) GetImage(ctx context.Context) (*io.ReadCloser, error) {
 	log.Println("getting image!")
 	client := restyClient.RestyClient.GetClient()
-	resp, err := client.Get("https://api.catboys.com/img")
+	//resp, err := client.Get("https://api.catboys.com/img")
+	resp, err := client.Get("http://localhost:4003")
+
 	if err != nil {
 		return nil, err
 	}
