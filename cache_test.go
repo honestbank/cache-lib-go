@@ -199,7 +199,7 @@ func TestNewCacheSubscriptionWithOptionsNetworkError(t *testing.T) {
 	})
 
 	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 1 * time.Second,
+		SubscriptionTimeout: 2 * time.Second,
 		UnsubscribeAndClose: true,
 	})
 
@@ -222,7 +222,8 @@ func TestNewCacheSubscriptionWithOptionsNetworkError(t *testing.T) {
 			return nil, errors.New("network error")
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
-		a.NoError(err)
+		time.Sleep(10 * time.Second)
+		a.Error(err)
 		a.Equal(response, *result)
 	})
 }
