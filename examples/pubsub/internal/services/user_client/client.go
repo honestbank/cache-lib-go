@@ -35,7 +35,6 @@ func (restyClient *userClient) GetUser(ctx context.Context, body UserBody) (*io.
 		"gender":  body.Gender,
 	})
 	client := restyClient.RestyClient.GetClient()
-
 	//resp, err := client.Get("https://randomuser.me/api/")
 	resp, err := client.Get("http://localhost:4002")
 	if err != nil {

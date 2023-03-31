@@ -32,6 +32,7 @@ func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data]
 	if options != nil {
 		builtOptions = options
 	}
+
 	return &cache[Data]{
 		client:  client,
 		options: builtOptions,
@@ -99,9 +100,9 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 	subscription.Subscribe(ctx)
 
 	defer func() {
-
 		if c.options.UnsubscribeAndClose {
 			subscription.UnsubscribeAndClose(ctx)
+
 			return
 		}
 		err := subscription.Unsubscribe(ctx)
