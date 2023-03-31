@@ -10,20 +10,31 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+type CacheOptions struct {
+	SubscriptionTimeout time.Duration
+	UnsubscribeAndClose bool
+}
+
 type Cache[Data any] interface {
 	RememberBlocking(ctx context.Context, missFn MissFunc[Data], hitFn HitFunc[Data], key string, ttl time.Duration) (*Data, error)
 }
 
 type cache[Data any] struct {
-	client *redis.Client
+	client  *redis.Client
+	options *CacheOptions
 }
 
 type MissFunc[Data any] func(ctx context.Context) (*Data, error)
 type HitFunc[Data any] func(ctx context.Context, data *Data)
 
-func NewCache[Data any](client *redis.Client) Cache[Data] {
+func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data] {
+	builtOptions := &CacheOptions{}
+	if options != nil {
+		builtOptions = options
+	}
 	return &cache[Data]{
-		client: client,
+		client:  client,
+		options: builtOptions,
 	}
 }
 
@@ -86,7 +97,13 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, missFn MissFunc[Data
 func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, error) {
 	subscription := NewCacheSubscription(c.client, key)
 	subscription.Subscribe(ctx)
+
 	defer func() {
+
+		if c.options.UnsubscribeAndClose {
+			subscription.UnsubscribeAndClose(ctx)
+			return
+		}
 		err := subscription.Unsubscribe(ctx)
 		if err != nil {
 			log.Println(err)
@@ -96,6 +113,12 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 	channel, err := subscription.GetChannel(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if c.options.SubscriptionTimeout != 0*time.Second {
+		go func() {
+			time.Sleep(c.options.SubscriptionTimeout)
+			subscription.UnsubscribeAndClose(ctx)
+		}()
 	}
 
 	for msg := range channel {
