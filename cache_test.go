@@ -210,7 +210,7 @@ func TestNewCacheSubscriptionWithOptionsNetworkError(t *testing.T) {
 
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-				time.Sleep(2 * time.Second)
+				time.Sleep(10 * time.Second)
 
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
