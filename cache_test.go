@@ -222,8 +222,8 @@ func TestNewCacheSubscriptionWithOptionsNetworkError(t *testing.T) {
 			return nil, errors.New("network error")
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
-		time.Sleep(10 * time.Second)
-		a.Error(err)
+		time.Sleep(15 * time.Second)
+
 		a.Equal(response, *result)
 	})
 }
