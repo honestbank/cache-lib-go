@@ -22,14 +22,14 @@ func TestNewCache(t *testing.T) {
 	a := assert.New(t)
 
 	db, _ := redismock.NewClientMock()
-	cache := cache_lib.NewCache[Response](db)
+	cache := cache_lib.NewCache[Response](db, nil)
 
 	a.NotNil(cache)
 }
 
 func TestCache_RememberBlocking(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	cache := cache_lib.NewCache[Response](db)
+	cache := cache_lib.NewCache[Response](db, nil)
 	t.Run("single cache", func(t *testing.T) {
 		a := assert.New(t)
 
@@ -131,7 +131,7 @@ func TestNewCacheSubscription(t *testing.T) {
 		DB:   0,
 	})
 
-	cache := cache_lib.NewCache[Response](redisClient)
+	cache := cache_lib.NewCache[Response](redisClient, nil)
 
 	t.Run("Multiple calls", func(t *testing.T) {
 		a := assert.New(t)
