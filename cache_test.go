@@ -192,38 +192,27 @@ func TestNewCacheSubscriptionWithOptions(t *testing.T) {
 	})
 }
 
-func TestNewCacheSubscriptionWithOptionsNetworkError(t *testing.T) {
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
-		DB:   0,
-	})
+func TestCacheFailSet(t *testing.T) {
+	db, mock := redismock.NewClientMock()
 
-	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 2 * time.Second,
-		UnsubscribeAndClose: true,
-	})
+	cache := cache_lib.NewCache[Response](db, nil)
 
-	t.Run("Multiple calls", func(t *testing.T) {
+	t.Run("fail set", func(t *testing.T) {
 		a := assert.New(t)
 
 		response := Response{Result: true}
 
-		go func() {
-			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-				time.Sleep(10 * time.Second)
+		mock.ExpectGet("data").SetVal("")
+		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", "", 1*time.Second).SetErr(errors.New("error"))
 
-				return &response, nil
-			}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
-		}()
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			time.Sleep(2 * time.Second)
 
-		result, _ := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(10 * time.Second)
-
-			return nil, errors.New("network error")
+			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
-		time.Sleep(15 * time.Second)
-
-		a.Equal(response, *result)
+		a.Error(err)
+		a.Nil(result)
 	})
 }

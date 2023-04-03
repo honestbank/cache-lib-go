@@ -77,10 +77,7 @@ func (c *cache[Data]) RememberBlocking(ctx context.Context, missFn MissFunc[Data
 
 		return nil, err
 	}
-	bytedata, err := json.Marshal(*data)
-	if err != nil {
-		return nil, err
-	}
+	bytedata, _ := json.Marshal(*data)
 	_, err = c.client.Set(ctx, key, string(bytedata), ttl).Result()
 	if err != nil {
 		log.Println(err)
