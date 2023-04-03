@@ -255,6 +255,7 @@ func TestRememberWait(t *testing.T) {
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 				time.Sleep(8 * time.Second)
+
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 		}()
@@ -287,15 +288,14 @@ func TestRememberWait2(t *testing.T) {
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 				time.Sleep(2 * time.Second)
+
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
 		}()
 		_, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
 
 		a.NoError(err)
-
 	})
 }
