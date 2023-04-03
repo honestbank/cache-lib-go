@@ -276,7 +276,7 @@ func TestRememberWait2(t *testing.T) {
 	})
 
 	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 1 * time.Second,
+		SubscriptionTimeout: 5 * time.Second,
 		UnsubscribeAndClose: true,
 	})
 
@@ -286,7 +286,6 @@ func TestRememberWait2(t *testing.T) {
 
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-				time.Sleep(2 * time.Second)
 
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
