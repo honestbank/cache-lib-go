@@ -42,7 +42,7 @@ jobs:
       - name: docker-compose
         run: docker compose up -d
       - name: Test and generate code coverage
-        run: go test -v -race --tags=integration_test -coverprofile=coverage.txt -covermode=atomic ./...
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
       - run: docker compose down
 
       - name: sonarcloud-scan
