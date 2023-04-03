@@ -215,4 +215,24 @@ func TestCacheFailSet(t *testing.T) {
 		a.Error(err)
 		a.Nil(result)
 	})
+
+	t.Run("fail publish", func(t *testing.T) {
+		a := assert.New(t)
+
+		response := Response{Result: true}
+
+		mock.ExpectGet("data").SetVal("")
+		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", "{\"result\":true}", 1*time.Second).SetVal("OK")
+		mock.ExpectPublish("data", response).SetErr(errors.New("error"))
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			time.Sleep(2 * time.Second)
+
+			return &response, nil
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
+
+		a.Error(err)
+		a.Nil(result)
+	})
 }
