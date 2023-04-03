@@ -9,6 +9,7 @@ import (
 
 type CacheSubscription interface {
 	Unsubscribe(ctx context.Context) error
+	UnsubscribeAndClose(ctx context.Context) error
 	Subscribe(ctx context.Context) CacheSubscription
 	GetChannel(ctx context.Context) (<-chan *redis.Message, error)
 }
@@ -36,6 +37,21 @@ func (cs *cacheSubscription) Unsubscribe(ctx context.Context) error {
 		return err
 	}
 
+	cs.Subscription = nil
+
+	return nil
+}
+
+func (cs *cacheSubscription) UnsubscribeAndClose(ctx context.Context) error {
+	if cs.Subscription == nil {
+		return nil
+	}
+	err := cs.Subscription.Unsubscribe(ctx, cs.channel)
+	if err != nil {
+		return err
+	}
+
+	cs.Subscription.Close()
 	cs.Subscription = nil
 
 	return nil

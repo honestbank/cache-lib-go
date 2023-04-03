@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	os "os"
+	"runtime"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -102,6 +104,7 @@ func main() {
 		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
 		DB:   0,
 	})
+	fmt.Println(runtime.NumCPU())
 
 	app := fiber.New()
 
@@ -111,22 +114,33 @@ func main() {
 
 	app.Get("/img", func(c *fiber.Ctx) error {
 
-		thecache := cache_lib.NewCache[IMGResponse](redisClient)
+		thecache := cache_lib.NewCache[IMGResponse](redisClient, &cache_lib.CacheOptions{SubscriptionTimeout: 5 * time.Second, UnsubscribeAndClose: true})
 		data, err := thecache.RememberBlocking(c.Context(), func(ctx context.Context) (*IMGResponse, error) {
 			data, err := imageClient.GetImage(c.Context())
-			var response IMGResponse
-			err = json.NewDecoder(*data).Decode(&response)
 			if err != nil {
 				fmt.Println(err)
 				return nil, err
 			}
+			var response IMGResponse
+			if data != nil {
+				err = json.NewDecoder(*data).Decode(&response)
+				if err != nil {
+					fmt.Println(err)
+					return nil, err
+				}
+			}
 			return &response, nil
 
+		}, func(ctx context.Context, data *IMGResponse) {
+			log.Println("Waiting for lock")
 		}, "img", 10*time.Second)
 		if err != nil {
 			return err
 		}
 		body, _ := json.Marshal(data)
+
+		subs := redisClient.PubSubNumSub(c.Context(), "img")
+		log.Println("SUBS", subs.Val()["img"])
 
 		return c.Send(body)
 
@@ -164,17 +178,25 @@ func main() {
 
 		hashedKey := hex.EncodeToString(hasher.Sum(nil))
 
-		thecache := cache_lib.NewCache[Response](redisClient)
+		thecache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{SubscriptionTimeout: 5 * time.Second, UnsubscribeAndClose: true})
 		data, err := thecache.RememberBlocking(c.Context(), func(ctx context.Context) (*Response, error) {
 			data, err := userClient.GetUser(c.Context(), body)
-			var response Response
-			err = json.NewDecoder(*data).Decode(&response)
 			if err != nil {
 				fmt.Println(err)
 				return nil, err
 			}
+			var response Response
+			if data != nil {
+				err = json.NewDecoder(*data).Decode(&response)
+				if err != nil {
+					fmt.Println(err)
+					return nil, err
+				}
+			}
 			return &response, nil
 
+		}, func(ctx context.Context, data *Response) {
+			log.Println("Waiting for lock")
 		}, hashedKey, 10*time.Second)
 		if err != nil {
 			return err
