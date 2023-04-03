@@ -268,3 +268,34 @@ func TestRememberWait(t *testing.T) {
 		a.Equal("error reading from pub/sub", err.Error())
 	})
 }
+
+func TestRememberWait2(t *testing.T) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
+		DB:   0,
+	})
+
+	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
+		SubscriptionTimeout: 1 * time.Second,
+		UnsubscribeAndClose: true,
+	})
+
+	t.Run("single cache", func(t *testing.T) {
+		a := assert.New(t)
+		response := Response{Result: true}
+		//responseString, _ := json.Marshal(response)
+		go func() {
+			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+				time.Sleep(2 * time.Second)
+				return &response, nil
+			}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
+		}()
+		_, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+
+			return &response, nil
+		}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
+
+		a.NoError(err)
+
+	})
+}
