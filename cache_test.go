@@ -283,7 +283,7 @@ func TestRememberWait2(t *testing.T) {
 	t.Run("single cache", func(t *testing.T) {
 		a := assert.New(t)
 		response := Response{Result: true}
-		//responseString, _ := json.Marshal(response)
+
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 				time.Sleep(2 * time.Second)
