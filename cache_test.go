@@ -251,16 +251,15 @@ func TestRememberWait(t *testing.T) {
 	t.Run("single cache", func(t *testing.T) {
 		a := assert.New(t)
 		response := Response{Result: true}
-		//responseString, _ := json.Marshal(response)
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-				time.Sleep(8 * time.Second)
+				time.Sleep(10 * time.Second)
 
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 		}()
 		_, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
@@ -277,18 +276,16 @@ func TestRememberWait2(t *testing.T) {
 	})
 
 	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 1 * time.Second,
+		SubscriptionTimeout: 5 * time.Second,
 		UnsubscribeAndClose: true,
 	})
 
 	t.Run("single cache", func(t *testing.T) {
 		a := assert.New(t)
 		response := Response{Result: true}
-		//responseString, _ := json.Marshal(response)
+
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-				time.Sleep(2 * time.Second)
-
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
 		}()
