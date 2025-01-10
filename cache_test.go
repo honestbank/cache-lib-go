@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"testing"
 	"time"
 
@@ -192,6 +193,94 @@ func TestNewCacheSubscriptionWithOptions(t *testing.T) {
 	})
 }
 
+func TestConcurrentRequestsForSameKey(t *testing.T) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: ":6379",
+		DB:   0,
+	})
+
+	subscriptionTimeout := time.Second * 5
+	keyTTL := time.Second * 2
+	requestProcessingTime := 100 * time.Millisecond
+
+	response := Response{Result: true}
+
+	// First request
+	resourceKey := "data"
+	go func() {
+		cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
+			SubscriptionTimeout: subscriptionTimeout,
+			UnsubscribeAndClose: true,
+		})
+		data, err := cache.RememberBlocking(
+			context.Background(),
+			func(ctx context.Context) (*Response, error) {
+				log.Println("miss from 1")
+				time.Sleep(requestProcessingTime)
+				return &response, nil
+			},
+			func(ctx context.Context, data *Response) {
+				log.Println("hit from 1 request")
+			},
+			resourceKey,
+			keyTTL,
+		)
+		log.Println("first request finished", data, err)
+	}()
+
+	// Second request come with some delay. Key is existing but subscription missed event and stuck till subscriptionTimeout
+	time.Sleep(requestProcessingTime + time.Millisecond*1)
+
+	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
+		SubscriptionTimeout: subscriptionTimeout,
+		UnsubscribeAndClose: true,
+	})
+	result, err := cache.RememberBlocking(context.Background(),
+		func(ctx context.Context) (*Response, error) {
+			log.Println("miss from 2")
+			time.Sleep(requestProcessingTime)
+			return &response, nil
+		},
+		func(ctx context.Context, data *Response) {
+			log.Println("hit from 2 request")
+		},
+		resourceKey,
+		keyTTL)
+	log.Println("second request finished", result, err)
+	assert.NoError(t, err)
+}
+
+func TestPublishBeforeSubscribe(t *testing.T) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: ":6379",
+		DB:   0,
+	})
+	_, err := redisClient.Publish(context.Background(), "foo", "before subscribe").Result()
+	assert.NoError(t, err)
+
+	subscription := cache_lib.NewCacheSubscription(redisClient, "foo")
+	subscription.Subscribe(context.Background())
+	channel, err := subscription.GetChannel(context.Background())
+	assert.NoError(t, err)
+	// Subscription timeout
+	go func() {
+		time.Sleep(time.Second * 5)
+		_ = subscription.UnsubscribeAndClose(context.Background())
+	}()
+	go func() {
+		_, err := redisClient.Publish(context.Background(), "foo", "publish immediately").Result()
+		assert.NoError(t, err)
+	}()
+	go func() {
+		time.Sleep(time.Millisecond * 10)
+		_, err := redisClient.Publish(context.Background(), "foo", "after subscribe").Result()
+		assert.NoError(t, err)
+	}()
+	for msg := range channel {
+		log.Println(msg.Payload)
+	}
+
+}
 func TestCacheFailSet(t *testing.T) {
 	db, mock := redismock.NewClientMock()
 
