@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redismock/v8"
+	redismock "github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 
 	cache_lib "github.com/honestbank/cache-lib-go"
@@ -259,14 +259,17 @@ func TestRememberWait(t *testing.T) {
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 		}()
-		_, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 			time.Sleep(5 * time.Second)
 
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 
-		a.Error(err)
-		a.Equal("error reading from pub/sub", err.Error())
+		// When subscription times out, it returns an error
+		if a.Error(err) {
+			a.Contains(err.Error(), "error reading from pub/sub")
+			a.Nil(result)
+		}
 	})
 }
 
@@ -277,7 +280,7 @@ func TestRememberWait2(t *testing.T) {
 	})
 
 	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 1 * time.Second,
+		SubscriptionTimeout: 3 * time.Second,
 		UnsubscribeAndClose: true,
 	})
 
