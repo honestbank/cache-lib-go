@@ -2,10 +2,11 @@ package img_client
 
 import (
 	"context"
-	"github.com/go-resty/resty/v2"
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type imageClient struct {
