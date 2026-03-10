@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	redismock "github.com/go-redis/redismock/v8"
+	"github.com/go-redis/redismock/v8"
 	"github.com/stretchr/testify/assert"
 
 	cache_lib "github.com/honestbank/cache-lib-go"
@@ -30,57 +30,84 @@ func TestNewCache(t *testing.T) {
 func TestCache_RememberBlocking(t *testing.T) {
 	db, mock := redismock.NewClientMock()
 	cache := cache_lib.NewCache[Response](db, nil)
+
 	t.Run("single cache", func(t *testing.T) {
 		a := assert.New(t)
 
 		response := Response{Result: true}
 		responseString, _ := json.Marshal(response)
 
-		mock.ExpectGet("data").SetVal("")
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectGet("data").RedisNil()
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetVal(true)
 		mock.ExpectSet("data", string(responseString), 1*time.Second).SetVal(string(responseString))
 		mock.ExpectPublish("data", string(responseString)).SetVal(1)
+		mock.ExpectDel("data:lock").SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(response, *result)
 	})
-	t.Run("single cache - invalid cached", func(t *testing.T) {
+
+	t.Run("single cache - cache hit", func(t *testing.T) {
+		a := assert.New(t)
+
+		response := Response{Result: true}
+		responseString, _ := json.Marshal(response)
+
+		mock.ExpectGet("data").SetVal(string(responseString))
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			return &response, nil
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
+
+		a.NoError(err)
+		a.Equal(response, *result)
+	})
+
+	t.Run("single cache - invalid cached data", func(t *testing.T) {
 		a := assert.New(t)
 
 		response := Response{Result: true}
 		responseString, _ := json.Marshal(response)
 
 		mock.ExpectGet("data").SetVal("not valid json")
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetVal(true)
 		mock.ExpectSet("data", string(responseString), 1*time.Second).SetVal(string(responseString))
 		mock.ExpectPublish("data", string(responseString)).SetVal(1)
+		mock.ExpectDel("data:lock").SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.NoError(err)
 		a.Equal(response, *result)
 	})
+
+	t.Run("single cache - getCachedData redis error", func(t *testing.T) {
+		a := assert.New(t)
+
+		mock.ExpectGet("data").SetErr(errors.New("redis connection error"))
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			return nil, nil
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
+
+		a.Error(err)
+		a.Nil(result)
+	})
+
 	t.Run("single cache - setNX error", func(t *testing.T) {
 		a := assert.New(t)
 
-		response := Response{Result: true}
-
-		mock.ExpectSetNX("data", "", 1*time.Second).SetErr(errors.New("Unable to set"))
+		mock.ExpectGet("data").RedisNil()
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetErr(errors.New("unable to set"))
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
-			return &response, nil
+			return nil, errors.New("request failed")
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.Error(err)
@@ -90,44 +117,68 @@ func TestCache_RememberBlocking(t *testing.T) {
 	t.Run("single cache - request error", func(t *testing.T) {
 		a := assert.New(t)
 
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
+		mock.ExpectGet("data").RedisNil()
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetVal(true)
+		mock.ExpectPublish("data", "cache:error").SetVal(0)
+		mock.ExpectDel("data:lock").SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
+			return nil, errors.New("request failed")
+		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
-			return nil, errors.New("request Failed")
+		a.Error(err)
+		a.Nil(result)
+	})
+}
+
+func TestCacheFailSet(t *testing.T) {
+	db, mock := redismock.NewClientMock()
+	cache := cache_lib.NewCache[Response](db, nil)
+
+	t.Run("fail set", func(t *testing.T) {
+		a := assert.New(t)
+
+		response := Response{Result: true}
+		responseString, _ := json.Marshal(response)
+
+		mock.ExpectGet("data").RedisNil()
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", string(responseString), 1*time.Second).SetErr(errors.New("error"))
+		mock.ExpectPublish("data", "cache:error").SetVal(0)
+		mock.ExpectDel("data:lock").SetVal(1)
+
+		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
+			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
 		a.Error(err)
 		a.Nil(result)
 	})
 
-	t.Run("single cache", func(t *testing.T) {
+	t.Run("fail publish", func(t *testing.T) {
 		a := assert.New(t)
 
 		response := Response{Result: true}
 		responseString, _ := json.Marshal(response)
 
-		mock.ExpectGet("data").SetVal("{}")
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
-		mock.ExpectSetNX("data", string(responseString), 1*time.Second).SetVal(true)
-
-		mock.ExpectPublish("data", string(responseString)).SetVal(1)
+		mock.ExpectGet("data").RedisNil()
+		mock.ExpectSetNX("data:lock", "", 1*time.Second).SetVal(true)
+		mock.ExpectSet("data", string(responseString), 1*time.Second).SetVal("OK")
+		mock.ExpectPublish("data", string(responseString)).SetErr(errors.New("error"))
+		mock.ExpectDel("data:lock").SetVal(1)
 
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
 
-		a.NoError(err)
-		a.Equal(Response{}, *result)
+		a.Error(err)
+		a.Nil(result)
 	})
 }
 
 func TestNewCacheSubscription(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
+		Addr: ":6379",
 		DB:   0,
 	})
 
@@ -159,12 +210,12 @@ func TestNewCacheSubscription(t *testing.T) {
 
 func TestNewCacheSubscriptionWithOptions(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
+		Addr: ":6379",
 		DB:   0,
 	})
 
 	cache := cache_lib.NewCache[Response](redisClient, &cache_lib.CacheOptions{
-		SubscriptionTimeout: 1 * time.Second,
+		SubscriptionTimeout: 3 * time.Second,
 		UnsubscribeAndClose: true,
 	})
 
@@ -192,54 +243,9 @@ func TestNewCacheSubscriptionWithOptions(t *testing.T) {
 	})
 }
 
-func TestCacheFailSet(t *testing.T) {
-	db, mock := redismock.NewClientMock()
-
-	cache := cache_lib.NewCache[Response](db, nil)
-
-	t.Run("fail set", func(t *testing.T) {
-		a := assert.New(t)
-
-		response := Response{Result: true}
-
-		mock.ExpectGet("data").SetVal("")
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
-		mock.ExpectSet("data", "", 1*time.Second).SetErr(errors.New("error"))
-
-		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
-			return &response, nil
-		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
-
-		a.Error(err)
-		a.Nil(result)
-	})
-
-	t.Run("fail publish", func(t *testing.T) {
-		a := assert.New(t)
-
-		response := Response{Result: true}
-
-		mock.ExpectGet("data").SetVal("")
-		mock.ExpectSetNX("data", "", 1*time.Second).SetVal(true)
-		mock.ExpectSet("data", "{\"result\":true}", 1*time.Second).SetVal("OK")
-		mock.ExpectPublish("data", response).SetErr(errors.New("error"))
-
-		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
-			time.Sleep(2 * time.Second)
-
-			return &response, nil
-		}, func(ctx context.Context, data *Response) {}, "data", 1*time.Second)
-
-		a.Error(err)
-		a.Nil(result)
-	})
-}
-
 func TestRememberWait(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
+		Addr: ":6379",
 		DB:   0,
 	})
 
@@ -248,10 +254,10 @@ func TestRememberWait(t *testing.T) {
 		UnsubscribeAndClose: true,
 	})
 
-	t.Run("single cache", func(t *testing.T) {
+	t.Run("times out waiting for cache result", func(t *testing.T) {
 		a := assert.New(t)
 		response := Response{Result: true}
-		//responseString, _ := json.Marshal(response)
+
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 				time.Sleep(8 * time.Second)
@@ -259,15 +265,15 @@ func TestRememberWait(t *testing.T) {
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 		}()
+
 		result, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 			time.Sleep(5 * time.Second)
 
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data2", 1*time.Second)
 
-		// When subscription times out, it returns an error
 		if a.Error(err) {
-			a.Contains(err.Error(), "error reading from pub/sub")
+			a.Contains(err.Error(), "timed out waiting for cache result")
 			a.Nil(result)
 		}
 	})
@@ -275,7 +281,7 @@ func TestRememberWait(t *testing.T) {
 
 func TestRememberWait2(t *testing.T) {
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: ":6379", // We connect to host redis, thats what the hostname of the redis service is set to in the docker-compose
+		Addr: ":6379",
 		DB:   0,
 	})
 
@@ -284,10 +290,10 @@ func TestRememberWait2(t *testing.T) {
 		UnsubscribeAndClose: true,
 	})
 
-	t.Run("single cache", func(t *testing.T) {
+	t.Run("subscriber receives result before timeout", func(t *testing.T) {
 		a := assert.New(t)
 		response := Response{Result: true}
-		//responseString, _ := json.Marshal(response)
+
 		go func() {
 			_, _ = cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 				time.Sleep(2 * time.Second)
@@ -295,6 +301,7 @@ func TestRememberWait2(t *testing.T) {
 				return &response, nil
 			}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)
 		}()
+
 		_, err := cache.RememberBlocking(context.Background(), func(ctx context.Context) (*Response, error) {
 			return &response, nil
 		}, func(ctx context.Context, data *Response) {}, "data3", 1*time.Second)

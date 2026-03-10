@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 )
+
+const errCache = "cache:error"
 
 type CacheOptions struct {
 	SubscriptionTimeout time.Duration
@@ -39,53 +42,81 @@ func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data]
 	}
 }
 
-func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
-	cachedData, _ := c.client.Get(ctx, key).Result()
+func (c *cache[Data]) getCachedData(ctx context.Context, key string) (*Data, error) {
+	cachedData, err := c.client.Get(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, nil // legitimate cache miss
+	}
+
+	if err != nil {
+		return nil, err // actual Redis error
+	}
 
 	if cachedData == "" {
-		return nil
+		return nil, nil
 	}
 
 	var marshaledData Data
-	err := json.Unmarshal([]byte(cachedData), &marshaledData)
-	if err != nil {
-		return nil
+	if err := json.Unmarshal([]byte(cachedData), &marshaledData); err != nil {
+		log.Printf("getCachedData: invalid JSON in cache, treating as miss: %v", err)
+
+		return nil, nil
 	}
 
-	return &marshaledData
+	return &marshaledData, nil
 }
 
 func (c *cache[Data]) RememberBlocking(ctx context.Context, missFn MissFunc[Data], hitFn HitFunc[Data], key string, ttl time.Duration) (*Data, error) {
-	cachedData := c.getCachedData(ctx, key)
+	cachedData, err := c.getCachedData(ctx, key)
+	if err != nil {
+		return nil, err
+	}
 	if cachedData != nil {
 		hitFn(ctx, cachedData)
 
 		return cachedData, nil
 	}
-	success, err := c.client.SetNX(ctx, key, "", ttl).Result()
+
+	success, err := c.client.SetNX(ctx, key+":lock", "", ttl).Result()
 	if err != nil {
 		log.Println(err)
 
 		return nil, err
 	}
+
 	if !success {
 		return c.rememberWait(ctx, key)
 	}
+
+	defer c.client.Del(ctx, key+":lock")
+
 	data, err := missFn(ctx)
 	if err != nil {
-		c.client.Publish(ctx, key, "cache miss")
+		c.client.Publish(ctx, key, errCache)
 
 		return nil, err
 	}
-	bytedata, _ := json.Marshal(*data)
+
+	bytedata, err := json.Marshal(*data)
+	if err != nil {
+		log.Println(err)
+		c.client.Publish(ctx, key, errCache)
+
+		return nil, err
+	}
+
 	_, err = c.client.Set(ctx, key, string(bytedata), ttl).Result()
 	if err != nil {
 		log.Println(err)
+		c.client.Publish(ctx, key, errCache)
 
 		return nil, err
 	}
+
 	_, err = c.client.Publish(ctx, key, string(bytedata)).Result()
 	if err != nil {
+		log.Println(err)
+
 		return nil, err
 	}
 
@@ -112,6 +143,7 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 	if err != nil {
 		return nil, err
 	}
+
 	if c.options.SubscriptionTimeout != 0*time.Second {
 		go func() {
 			time.Sleep(c.options.SubscriptionTimeout)
@@ -120,16 +152,20 @@ func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, erro
 	}
 
 	for msg := range channel {
-		if msg.Payload != "" {
-			var u Data
-			// Unmarshal the data into the user
-			if err := json.Unmarshal([]byte(msg.Payload), &u); err != nil {
-				return nil, err
-			}
-
-			return &u, nil
+		if msg.Payload == "" {
+			continue
 		}
+		// Check if the lock holder signalled a failure
+		if msg.Payload == errCache {
+			return nil, errors.New("cache fetch failed, upstream returned an error")
+		}
+		var u Data
+		if err := json.Unmarshal([]byte(msg.Payload), &u); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal cache result: %w", err)
+		}
+
+		return &u, nil
 	}
 
-	return nil, errors.New("error reading from pub/sub")
+	return nil, errors.New("timed out waiting for cache result")
 }
