@@ -8,14 +8,14 @@ on:
 
 jobs:
   build:
-    name: go-tests
+    name: go-tests-matrix
     runs-on: ubuntu-latest
     strategy:
       matrix:
         go: [ "1.24" ]
     steps:
       - name: Set up Golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
         id: go
@@ -51,6 +51,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: true
+  all-tests-passed:
+    name: go-tests
+    needs: [ build ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check build success
+        if: ${{ needs.build.result != 'success' }}
+        run: exit 1
+      - name: Success
+        if: ${{ needs.build.result == 'success' }}
+        run: exit 0
   release:
     name: semantic-release
     runs-on: ubuntu-latest
