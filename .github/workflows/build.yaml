@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: go-tests-matrix
@@ -67,6 +70,10 @@ jobs:
     name: semantic-release
     runs-on: ubuntu-latest
     needs: [ build ]
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
       - name: Set up Golang
         uses: actions/setup-go@v2
