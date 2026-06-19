@@ -35,7 +35,7 @@ jobs:
         run: go clean -modcache;go mod tidy; go mod download; go mod verify;
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018 # v2.5.2
         with:
           version: latest
           args: --timeout=5m --modules-download-mode=readonly
@@ -49,7 +49,7 @@ jobs:
       - run: docker compose down
 
       - name: sonarcloud-scan
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarcloud-github-action@ba3875ecf642b2129de2b589510c81a8b53dbf4e # master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: release
-        uses: cycjimmy/semantic-release-action@v2
+        uses: cycjimmy/semantic-release-action@5982a02995853159735cb838992248c4f0f16166 # v2.7.0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
