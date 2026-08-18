@@ -57,7 +57,7 @@ func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
 	}
 
 	var marshaledData Data
-	err := json.Unmarshal([]byte(cachedData), &marshaledData)
+	err = json.Unmarshal([]byte(cachedData), &marshaledData)
 	if err != nil {
 		return nil
 	}
