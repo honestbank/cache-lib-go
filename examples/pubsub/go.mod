@@ -7,7 +7,7 @@ replace github.com/honestbank/cache-lib-go => ./../../
 require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-resty/resty/v2 v2.7.0
-	github.com/gofiber/fiber/v2 v2.52.11
+	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/honestbank/cache-lib-go v0.0.0-00010101000000-000000000000
 )
 
