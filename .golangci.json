@@ -1,49 +1,71 @@
 {
-    "_ignore": "DO NOT MODIFY THIS FILE: https://github.com/honestbank/.github/blob/main/docs/about.md",
-    "run": {
-        "tests": true
+    "formatters": {
+        "enable": [
+            "gofmt",
+            "goimports"
+        ],
+        "exclusions": {
+            "generated": "lax",
+            "paths": [
+                "graph",
+                ".*/generated/*",
+                "third_party$",
+                "builtin$",
+                "examples$"
+            ]
+        }
     },
     "linters": {
-        "disable-all": true,
         "enable": [
-            "errcheck",
-            "gosimple",
-            "govet",
-            "ineffassign",
-            "staticcheck",
-            "unused",
-            "gofmt",
-            "goimports",
-            "nestif",
             "asciicheck",
+            "copyloopvar",
             "exhaustive",
             "forbidigo",
             "gocyclo",
             "makezero",
             "misspell",
             "nakedret",
+            "nestif",
             "nilerr",
             "nlreturn",
             "nolintlint",
             "testpackage",
             "unconvert",
+            "wastedassign",
             "whitespace"
-        ]
-    },
-    "issues": {
-        "exclude-files": [
-            "graph"
         ],
-        "exclude-dirs": [
-            ".*/generated/*",
-            "examples"
-        ],
-        "exclude-dirs-use-default": true,
-        "exclude-rules": [
-            {
-                "path": "_test\\.go",
-                "linters": ["errcheck"]
+        "exclusions": {
+            "generated": "lax",
+            "paths": [
+                "graph",
+                ".*/generated/*",
+                "third_party$",
+                "builtin$",
+                "examples$"
+            ],
+            "presets": [
+                "comments",
+                "common-false-positives",
+                "legacy",
+                "std-error-handling"
+            ],
+            "rules": [
+                {
+                    "linters": [
+                        "errcheck"
+                    ],
+                    "path": "_test.go"
+                }
+            ]
+        },
+        "settings": {
+            "errcheck": {
+                "check-blank": true
             }
-        ]
-    }
+        }
+    },
+    "run": {
+        "tests": true
+    },
+    "version": "2"
 }
