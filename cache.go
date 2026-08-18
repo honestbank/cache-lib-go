@@ -51,14 +51,20 @@ func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data]
 }
 
 func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
-	cachedData, _ := c.client.Get(ctx, key).Result()
+	cachedData, err := c.client.Get(ctx, key).Result()
+	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			log.Println("cache: Get failed:", err)
+		}
 
+		return nil
+	}
 	if cachedData == "" {
 		return nil
 	}
 
 	var marshaledData Data
-	err := json.Unmarshal([]byte(cachedData), &marshaledData)
+	err = json.Unmarshal([]byte(cachedData), &marshaledData)
 	if err != nil {
 		return nil
 	}
@@ -118,7 +124,14 @@ func (c *cache[Data]) tryPopulatingCache(ctx context.Context, missFn MissFunc[Da
 
 		return nil, err
 	}
-	bytedata, _ := json.Marshal(*data)
+	bytedata, err := json.Marshal(*data)
+	if err != nil {
+		log.Println("cache: marshal failed, releasing lock and notifying waiters:", err)
+		c.client.Del(ctx, key)
+		c.client.Publish(ctx, key, retrySignal)
+
+		return data, nil
+	}
 	if _, err = c.client.Set(ctx, key, string(bytedata), ttl).Result(); err != nil {
 		log.Println("cache: Set failed, releasing lock and notifying waiters:", err)
 		c.client.Del(ctx, key)
