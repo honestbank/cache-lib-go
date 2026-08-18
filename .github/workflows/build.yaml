@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ "1.24" ]
+        go: [ "1.26" ]
     steps:
       - name: Set up Golang
         uses: actions/setup-go@v5
@@ -78,7 +78,7 @@ jobs:
       - name: Set up Golang
         uses: actions/setup-go@v2
         with:
-          go-version: "1.24"
+          go-version: "1.26"
         id: go
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
