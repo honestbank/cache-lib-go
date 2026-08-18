@@ -1,6 +1,6 @@
 module github.com/pubsub_example
 
-go 1.24.0
+go 1.25.0
 
 replace github.com/honestbank/cache-lib-go => ./../../
 
@@ -23,6 +23,6 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.69.0 // indirect
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )
