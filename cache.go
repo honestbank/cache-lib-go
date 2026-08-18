@@ -52,7 +52,14 @@ func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data]
 
 func (c *cache[Data]) getCachedData(ctx context.Context, key string) *Data {
 	cachedData, err := c.client.Get(ctx, key).Result()
-	if err != nil || cachedData == "" {
+	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			log.Println("cache: Get failed:", err)
+		}
+
+		return nil
+	}
+	if cachedData == "" {
 		return nil
 	}
 
