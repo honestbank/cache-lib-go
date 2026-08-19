@@ -1,7 +1,7 @@
 # DO NOT CHANGE. This file is being managed from a central repository
 # To know more simply visit https://github.com/honestbank/.github/blob/main/docs/about.md
 
-FROM golang:1.18 as builder
+FROM golang:1.26 AS builder
 WORKDIR /app
 COPY . .
 
