@@ -8,4 +8,4 @@
 # the repo. Unless a later match takes precedence,
 # @global-owner1 and @global-owner2 will be requested for
 # review when someone opens a pull request.
-*       @honestbank/backend-engineers @honestbank/honestbank-engineers
+* @honestbank/backend-engineers @honestbank/l3-backend-engineers
