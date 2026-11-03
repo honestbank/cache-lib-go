@@ -121,9 +121,10 @@ func main() {
 				fmt.Println(err)
 				return nil, err
 			}
+			defer data.Close()
 			var response IMGResponse
 			if data != nil {
-				err = json.NewDecoder(*data).Decode(&response)
+				err = json.NewDecoder(data).Decode(&response)
 				if err != nil {
 					fmt.Println(err)
 					return nil, err
@@ -185,9 +186,10 @@ func main() {
 				fmt.Println(err)
 				return nil, err
 			}
+			defer data.Close()
 			var response Response
 			if data != nil {
-				err = json.NewDecoder(*data).Decode(&response)
+				err = json.NewDecoder(data).Decode(&response)
 				if err != nil {
 					fmt.Println(err)
 					return nil, err

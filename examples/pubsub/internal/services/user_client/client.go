@@ -18,7 +18,7 @@ type UserBody struct {
 }
 
 type UserClient interface {
-	GetUser(ctx context.Context, body UserBody) (*io.ReadCloser, error)
+	GetUser(ctx context.Context, body UserBody) (io.ReadCloser, error)
 }
 
 func NewUserClient(client *http.Client) UserClient {
@@ -28,7 +28,7 @@ func NewUserClient(client *http.Client) UserClient {
 	}
 }
 
-func (restyClient *userClient) GetUser(ctx context.Context, body UserBody) (*io.ReadCloser, error) {
+func (restyClient *userClient) GetUser(ctx context.Context, body UserBody) (io.ReadCloser, error) {
 	log.Println("getting User!")
 	restyClient.RestyClient.SetQueryParams(map[string]string{
 		"results": "1",
@@ -40,5 +40,5 @@ func (restyClient *userClient) GetUser(ctx context.Context, body UserBody) (*io.
 	if err != nil {
 		return nil, err
 	}
-	return &resp.Body, nil
+	return resp.Body, nil
 }
