@@ -14,7 +14,7 @@ type imageClient struct {
 }
 
 type ImageClient interface {
-	GetImage(ctx context.Context) (*io.ReadCloser, error)
+	GetImage(ctx context.Context) (io.ReadCloser, error)
 }
 
 func NewImageClient(client *http.Client) ImageClient {
@@ -23,7 +23,7 @@ func NewImageClient(client *http.Client) ImageClient {
 		RestyClient: restyClient}
 }
 
-func (restyClient *imageClient) GetImage(ctx context.Context) (*io.ReadCloser, error) {
+func (restyClient *imageClient) GetImage(ctx context.Context) (io.ReadCloser, error) {
 	log.Println("getting image!")
 	client := restyClient.RestyClient.GetClient()
 	//resp, err := client.Get("https://api.catboys.com/img")
@@ -32,5 +32,5 @@ func (restyClient *imageClient) GetImage(ctx context.Context) (*io.ReadCloser, e
 	if err != nil {
 		return nil, err
 	}
-	return &resp.Body, nil
+	return resp.Body, nil
 }
