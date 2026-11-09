@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -21,8 +22,22 @@ const (
 
 var errRetry = errors.New("cache: winner failed, retrying")
 
+// waits collapses the concurrent waits for the same Redis client and key in
+// this process. Each wait holds one Pub/Sub connection, which go-redis v8
+// dials outside the pool, so one process holds at most one Pub/Sub
+// connection per key. It is a package variable because callers can make a
+// new Cache for each request.
+var waits singleflight.Group
+
 type CacheOptions struct {
+	// SubscriptionTimeout is the maximum time that a waiter waits for the
+	// winner to publish the data. After it, the waiter falls back to the miss
+	// function. Zero means no timeout: the wait then stops only when the
+	// context of the first waiter is done.
 	SubscriptionTimeout time.Duration
+	// UnsubscribeAndClose is kept for backward compatibility and has no
+	// effect: RememberBlocking always unsubscribes and closes its
+	// subscription.
 	UnsubscribeAndClose bool
 }
 
@@ -31,8 +46,9 @@ type Cache[Data any] interface {
 }
 
 type cache[Data any] struct {
-	client  *redis.Client
-	options *CacheOptions
+	client          *redis.Client
+	options         *CacheOptions
+	newSubscription func(client *redis.Client, channel string) CacheSubscription
 }
 
 type MissFunc[Data any] func(ctx context.Context) (*Data, error)
@@ -45,8 +61,9 @@ func NewCache[Data any](client *redis.Client, options *CacheOptions) Cache[Data]
 	}
 
 	return &cache[Data]{
-		client:  client,
-		options: builtOptions,
+		client:          client,
+		options:         builtOptions,
+		newSubscription: NewCacheSubscription,
 	}
 }
 
@@ -146,47 +163,69 @@ func (c *cache[Data]) tryPopulatingCache(ctx context.Context, missFn MissFunc[Da
 	return data, nil
 }
 
+// rememberWait waits for the winner to publish the data of key. Concurrent
+// waits for the same client, timeout and key share one subscription. The
+// timeout is part of the key, so each caller gets its own timeout.
 func (c *cache[Data]) rememberWait(ctx context.Context, key string) (*Data, error) {
-	subscription := NewCacheSubscription(c.client, key)
-	subscription.Subscribe(ctx)
-
-	defer func() {
-		if c.options.UnsubscribeAndClose {
-			subscription.UnsubscribeAndClose(ctx)
-
-			return
-		}
-		err := subscription.Unsubscribe(ctx)
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
-	channel, err := subscription.GetChannel(ctx)
+	waitKey := fmt.Sprintf("%p\x00%d\x00%s", c.client, c.options.SubscriptionTimeout, key)
+	result, err, _ := waits.Do(waitKey, func() (any, error) {
+		return c.waitForPayload(ctx, key)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if c.options.SubscriptionTimeout != 0*time.Second {
-		go func() {
-			time.Sleep(c.options.SubscriptionTimeout)
-			subscription.UnsubscribeAndClose(ctx)
-		}()
+	payload, ok := result.(string)
+	if !ok {
+		return nil, fmt.Errorf("cache: unexpected wait result of type %T", result)
+	}
+	if payload == retrySignal {
+		return nil, errRetry
 	}
 
-	for msg := range channel {
-		if msg.Payload == retrySignal {
-			return nil, errRetry
+	var data Data
+	if err := json.Unmarshal([]byte(payload), &data); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+// waitForPayload subscribes to key and returns the first payload that is not
+// empty. It always unsubscribes and closes the subscription before it
+// returns.
+func (c *cache[Data]) waitForPayload(ctx context.Context, key string) (string, error) {
+	waitCtx := ctx
+	if c.options.SubscriptionTimeout > 0 {
+		// The other waiters of this key share the wait, so a cancelled first
+		// waiter must not stop it. The timeout limits the wait.
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), c.options.SubscriptionTimeout)
+		defer cancel()
+	}
+
+	subscription := c.newSubscription(c.client, key).Subscribe(waitCtx)
+	defer func() {
+		if err := subscription.UnsubscribeAndClose(waitCtx); err != nil {
+			log.Println("cache: subscription cleanup failed:", err)
 		}
-		if msg.Payload != "" {
-			var u Data
-			// Unmarshal the data into the user
-			if err := json.Unmarshal([]byte(msg.Payload), &u); err != nil {
-				return nil, err
+	}()
+
+	channel, err := subscription.GetChannel(waitCtx)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		select {
+		case <-waitCtx.Done():
+			return "", fmt.Errorf("cache: waiting for the cache subscription: %w", waitCtx.Err())
+		case msg, ok := <-channel:
+			if !ok {
+				return "", errors.New("error reading from cache subscription channel")
 			}
-
-			return &u, nil
+			if msg.Payload != "" {
+				return msg.Payload, nil
+			}
 		}
 	}
-
-	return nil, errors.New("error reading from cache subscription channel")
 }
